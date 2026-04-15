@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Book Recommendation System</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+
+<style>
+body {
+    font-family: 'Poppins';
+    background: linear-gradient(to right, #667eea, #764ba2);
+    text-align: center;
+    color: white;
+}
+
+h1 { font-size: 40px; }
+
+form {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin: 20px;
+}
+
+input {
+    padding: 12px;
+    width: 320px;
+    border-radius: 25px;
+    border: none;
+}
+
+button {
+    padding: 10px 20px;
+    border-radius: 25px;
+    background: #FF7F50;
+    color: white;
+    border: none;
+    cursor: pointer;
+}
+
+.grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 20px;
+}
+
+.card {
+    background: white;
+    color: black;
+    width: 180px;
+    padding: 10px;
+    border-radius: 10px;
+}
+
+img {
+    width: 100%;
+    height: 220px;
+    object-fit: cover;
+}
+
+.stars { color: gold; }
+
+#suggestions {
+    background: white;
+    color: black;
+    max-width: 320px;
+    margin: auto;
+    border-radius: 10px;
+    text-align: left;
+}
+
+#toast {
+    visibility: hidden;
+    background: #333;
+    color: white;
+    padding: 10px;
+    border-radius: 20px;
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+#toast.show { visibility: visible; }
+
+.view-fav {
+    margin: 10px;
+    background: #ff4d6d;
+}
+
+.fav-btn {
+    background: #ff4d6d;
+    margin-top: 5px;
+}
+
+.remove-btn {
+    background: red;
+    margin-top: 5px;
+}
+</style>
+</head>
+
+<body>
+
+<h1>📚 BOOK RECOMMENDATION SYSTEM</h1>
+
+<!-- SEARCH -->
+<form method="post" action="/recommend">
+    <input type="text" id="searchBox" name="book" placeholder="Search book..." onkeyup="getSuggestions()">
+    <button>Recommend</button>
+</form>
+
+<!-- AUTO SUGGESTIONS -->
+<div id="suggestions"></div>
+
+<!-- TRENDING -->
+<button onclick="loadTrending()" class="view-fav">🔥 Show Trending</button>
+<div id="trending" class="grid"></div>
+
+<!-- FAVORITES -->
+<button class="view-fav" onclick="showFav()">❤️ View Favourites</button>
+<div id="favSection"></div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- ERROR -->
+{% if error %}
+<p style="color:yellow; font-size:18px;">{{error}}</p>
+{% endif %}
+
+<!-- =========================
+RECOMMENDATION SECTIONS
+========================= -->
+
+{% macro show_section(title, data) %}
+{% if data %}
+<h2>{{title}}</h2>
+<div class="grid">
+
+{% for t,a,img,r,n in data %}
+<div class="card">
+
+<img src="{{img}}">
+
+<h4>{{t}}</h4>
+<p>{{a}}</p>
+
+<div class="stars">
+{% for i in range(1,6) %}
+{% if r >= i %} ⭐ {% else %} ☆ {% endif %}
+{% endfor %}
+</div>
+
+<p>{{r}} | {{n}} ratings</p>
+
+<!-- FAVORITE BUTTON -->
+<button class="fav-btn" data-book="{{t}}" onclick="toggleFav(this)">
+❤️ Add
+</button>
+
+</div>
+{% endfor %}
+
+</div>
+{% endif %}
+{% endmacro %}
+
+{{ show_section("Genre Based", genre_rec) }}
+{{ show_section("Author Based", author_rec) }}
+{{ show_section("Description Based", desc_rec) }}
+
+<!-- =========================
+JAVASCRIPT
+========================= -->
+<script>
+
+// =====================
+// TOAST
+// =====================
+function showToast(msg){
+    let t = document.getElementById("toast");
+    t.innerHTML = msg;
+    t.className = "show";
+    setTimeout(()=>t.className="",2000);
+}
+
+// =====================
+// FAVORITES
+// =====================
+function toggleFav(btn){
+    let book = btn.getAttribute("data-book");
+    let favs = JSON.parse(localStorage.getItem("favs")) || [];
+
+    if(favs.includes(book)){
+        favs = favs.filter(b => b !== book);
+        btn.innerHTML = "❤️ Add";
+        showToast("Removed");
+    } else {
+        favs.push(book);
+        btn.innerHTML = "✅ Added";
+        showToast("Added");
+    }
+
+    localStorage.setItem("favs", JSON.stringify(favs));
+    showFav();
+}
+
+// =====================
+// SHOW FAVORITES
+// =====================
+function showFav(){
+    let favs = JSON.parse(localStorage.getItem("favs")) || [];
+
+    if(favs.length === 0){
+        document.getElementById("favSection").innerHTML = "<p>No favourites yet</p>";
+        return;
+    }
+
+    let html = "<h2>❤️ Your Favourites</h2><div class='grid'>";
+
+    favs.forEach(b=>{
+        html += `
+        <div class="card">
+            <p>${b}</p>
+            <button class="remove-btn" onclick="removeFromFav('${b}')">Remove</button>
+        </div>`;
+    });
+
+    html += "</div>";
+    document.getElementById("favSection").innerHTML = html;
+}
+
+// =====================
+// REMOVE FAVORITE
+// =====================
+function removeFromFav(book){
+    let favs = JSON.parse(localStorage.getItem("favs")) || [];
+    favs = favs.filter(b => b !== book);
+    localStorage.setItem("favs", JSON.stringify(favs));
+
+    showFav();
+    showToast("Removed");
+
+    document.querySelectorAll(".fav-btn").forEach(btn=>{
+        if(btn.getAttribute("data-book") === book){
+            btn.innerHTML = "❤️ Add";
+        }
+    });
+}
+
+// =====================
+// AUTO SUGGESTIONS
+// =====================
+function getSuggestions(){
+    let query = document.getElementById("searchBox").value;
+
+    if(query.length < 2){
+        document.getElementById("suggestions").innerHTML = "";
+        return;
+    }
+
+    fetch(`/search?q=${query}`)
+    .then(res => res.json())
+    .then(data => {
+        let html = "";
+
+        data.results.forEach(b=>{
+            html += `<p onclick="selectBook('${b.replace(/'/g,"\\'")}')"
+            style="cursor:pointer;padding:5px">${b}</p>`;
+        });
+
+        document.getElementById("suggestions").innerHTML = html;
+    });
+}
+
+function selectBook(name){
+    document.getElementById("searchBox").value = name;
+    document.getElementById("suggestions").innerHTML = "";
+}
+
+// =====================
+// TRENDING BOOKS
+// =====================
+function loadTrending(){
+    fetch("/trending")
+    .then(res => res.json())
+    .then(data => {
+        let html = "";
+
+        data.trending.forEach(b=>{
+            html += `
+            <div class="card">
+                <img src="${b.image}">
+                <h4>${b.title}</h4>
+                <p>${b.author}</p>
+                <p>⭐ ${b.rating}</p>
+            </div>`;
+        });
+
+        document.getElementById("trending").innerHTML = html;
+    });
+}
+
+// =====================
+// LOAD FAVS ON START
+// =====================
+window.onload = function(){
+    let favs = JSON.parse(localStorage.getItem("favs")) || [];
+
+    document.querySelectorAll(".fav-btn").forEach(btn=>{
+        let b = btn.getAttribute("data-book");
+        if(favs.includes(b)){
+            btn.innerHTML = "✅ Added";
+        }
+    });
+};
+
+</script>
+
+</body>
+</html>
