@@ -9,7 +9,7 @@ app = Flask(__name__)
 # =========================
 # 📚 LOAD DATA
 # =========================
-books = pd.read_csv("Books.csv", low_memory=False)
+books = pd.read_csv("books.csv", low_memory=False)
 ratings = pd.read_csv("Ratings.csv", low_memory=False)
 
 books = books.fillna("")
